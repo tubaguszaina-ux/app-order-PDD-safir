@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Order PDD</title>
+<meta name="application-name" content="Order PDD">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Order PDD">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root{color-scheme:light dark;--bg:#ffffff;--ink:#000000;--muted:#636366;--tint:#0071e3;--fill:#f2f2f7}
+  @media (prefers-color-scheme:dark){:root{--bg:#000000;--ink:#ffffff;--muted:#aeaeb2;--tint:#4da3ff;--fill:#1c1c1e}}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overscroll-behavior:none;
+    font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,"Segoe UI",Roboto,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  /* Bingkai penuh layar; area aman (poni dan garis home) diisi warna latar */
+  .shell{position:fixed;inset:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);background:var(--bg)}
+  iframe{display:block;width:100%;height:100%;border:0;background:var(--bg);opacity:0;transition:opacity .35s}
+  iframe.siap{opacity:1}
+
+  .tengah{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;background:var(--bg);
+    transition:opacity .35s,visibility .35s}
+  .tengah[hidden]{display:none}
+  .tengah.pudar{opacity:0;visibility:hidden}
+  .logo{width:96px;height:96px;border-radius:22px;box-shadow:0 6px 24px rgba(0,0,0,.14)}
+  .spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--fill);border-top-color:var(--tint);animation:putar .8s linear infinite}
+  @keyframes putar{to{transform:rotate(360deg)}}
+  .judul{font-size:1.25rem;font-weight:700;letter-spacing:-.02em}
+  .teks{max-width:300px;color:var(--muted);font-size:.9375rem}
+  .tombol{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 24px;border:0;border-radius:999px;background:var(--tint);color:#fff;
+    font:inherit;font-weight:600;text-decoration:none;cursor:pointer}
+  .tombol.teks-saja{background:transparent;color:var(--tint)}
+  #bantuan{display:flex;flex-direction:column;align-items:center;gap:6px}
+  #bantuan[hidden]{display:none}
+  @media (prefers-reduced-motion:reduce){.spin{animation-duration:1.8s}iframe{transition:none}.tengah{transition:none}}
+</style>
+</head>
+<body>
+<div class="shell"><iframe id="app" title="Link Orderan PDD Safir 1448" allow="clipboard-write; fullscreen" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+
+<!-- Layar pemuatan -->
+<div class="tengah" id="muat" role="status" aria-live="polite">
+  <img class="logo" src="icons/icon-192.png" alt="Logo PDD" width="96" height="96">
+  <div class="spin" aria-hidden="true"></div>
+  <div id="bantuan" hidden>
+    <p class="teks">Masih memuat. Pastikan internetmu aktif. Kalau tetap kosong, buka langsung di browser.</p>
+    <a class="tombol teks-saja" id="langsung" target="_blank" rel="noopener">Buka di browser</a>
+  </div>
+</div>
+
+<!-- Tanpa internet -->
+<div class="tengah" id="luring" hidden role="alert">
+  <img class="logo" src="icons/icon-192.png" alt="" width="96" height="96">
+  <h1 class="judul" style="margin:0">Tidak ada koneksi internet</h1>
+  <p class="teks">Order dikirim langsung ke spreadsheet PDD, jadi butuh internet. Sambungkan lalu coba lagi.</p>
+  <button type="button" class="tombol" id="ulangi">Coba lagi</button>
+</div>
+
+<noscript><p style="padding:24px">Aplikasi ini butuh JavaScript. Aktifkan JavaScript di browsermu.</p></noscript>
+
+<script>
+(function () {
+  /* ===== PENGATURAN: ganti kalau link web app Apps Script berubah ===== */
+  var URL_APLIKASI = 'https://script.google.com/macros/s/AKfycbzNNZylzxLyb3p-iwmtmj8tfIVXAC8TInQKBD75UjMViTA3s7QLRqPlg5wkGWYYbZ-q/exec';
+  /* ==================================================================== */
+
+  function $(id) { return document.getElementById(id); }
+  var frame = $('app'), muat = $('muat'), luring = $('luring'), bantuan = $('bantuan');
+  var timer = null, termuat = false;
+
+  // Cadangan: tambahkan ?langsung di akhir alamat untuk membuka Apps Script tanpa cangkang
+  if (/[?&]langsung\b/.test(location.search)) { location.replace(URL_APLIKASI); return; }
+  $('langsung').href = URL_APLIKASI;
+
+  function mulai() {
+    termuat = false;
+    luring.hidden = true;
+    muat.hidden = false; muat.classList.remove('pudar'); bantuan.hidden = true;
+    frame.classList.remove('siap');
+    clearTimeout(timer);
+    if (!navigator.onLine) { muat.hidden = true; luring.hidden = false; return; }
+    timer = setTimeout(function () { if (!termuat) bantuan.hidden = false; }, 10000);
+    frame.src = URL_APLIKASI;
+  }
+  frame.addEventListener('load', function () {
+    if (!frame.getAttribute('src')) return;
+    termuat = true; clearTimeout(timer);
+    frame.classList.add('siap'); muat.classList.add('pudar');
+    setTimeout(function () { if (termuat) muat.hidden = true; }, 400);
+  });
+  window.addEventListener('offline', function () { muat.hidden = true; luring.hidden = false; });
+  window.addEventListener('online', function () { if (!termuat || !luring.hidden) mulai(); });
+  $('ulangi').addEventListener('click', mulai);
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { /* tanpa cache luring, aplikasi tetap jalan */ }); });
+  }
+  mulai();
+})();
+</script>
+</body>
+</html>
